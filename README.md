@@ -4,6 +4,7 @@ This isolated project prepares a secure no-Steam-Deck update path for the M5Stac
 
 ## Security model
 
+- The build uses M5Stack's official AtomS3R board definition: DIO flash mode, QIO/OPI memory type, `m5stack_atoms3` variant, and `ARDUINO_M5STACK_ATOMS3R`.
 - ECDSA P-256 signs a canonical four-line manifest.
 - The firmware embeds only the public key.
 - HTTPS validates transport; the signature remains authoritative if hosting is compromised.
