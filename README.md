@@ -87,4 +87,4 @@ GitHub Actions uses a freshly generated disposable CI key. It never receives the
 
 ## Important
 
-The current `ota_config.h` points at the intended public GitHub manifest location but intentionally contains an invalid CA placeholder. A development build can compile, but cannot contact an update server. This prevents accidental deployment before production CA and key setup are complete.
+The current `ota_config.h` points at the intended public GitHub manifest location and embeds the public ISRG Root X1 plus USERTrust ECC roots needed by the current GitHub Raw/Releases chains. Production builds still require a locally generated `include/public_key.h`; that generated header is intentionally ignored by Git.
