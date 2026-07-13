@@ -18,7 +18,7 @@ jobs:
       - name: Install isolated tools
         run: |
           uv venv .venv
-          uv pip install --python .venv/bin/python platformio cryptography
+          uv pip install --python .venv/bin/python pip platformio cryptography
       - name: Generate disposable CI key
         run: |
           mkdir -p .dev
