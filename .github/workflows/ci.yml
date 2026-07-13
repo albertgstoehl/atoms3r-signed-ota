@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install isolated tools
+        run: |
+          uv venv .venv
+          uv pip install --python .venv/bin/python platformio cryptography
+      - name: Generate disposable CI key
+        run: |
+          mkdir -p .dev
+          .venv/bin/python tools/ota_release.py generate-key \
+            --private .dev/ci-private.pem --public .dev/ci-public.pem
+          .venv/bin/python tools/ota_release.py make-header \
+            --public .dev/ci-public.pem --output include/public_key.h
+      - name: Build AtomS3R OTA firmware
+        run: .venv/bin/pio run -e ota
+      - name: Sign and verify test release
+        run: |
+          .venv/bin/python tools/ota_release.py release \
+            --private .dev/ci-private.pem \
+            --firmware .pio/build/ota/firmware.bin \
+            --version 2 \
+            --base-url https://github.com/albertgstoehl/atoms3r-signed-ota/releases/download/v2 \
+            --output-dir dist-test
+          .venv/bin/python tools/ota_release.py verify \
+            --public .dev/ci-public.pem \
+            --manifest dist-test/manifest.txt \
+            --firmware dist-test/atoms3r-v2.bin
+      - name: Reject tampering
+        run: |
+          cp dist-test/atoms3r-v2.bin /tmp/tampered.bin
+          printf X | dd of=/tmp/tampered.bin bs=1 seek=123 conv=notrunc status=none
+          if .venv/bin/python tools/ota_release.py verify \
+            --public .dev/ci-public.pem \
+            --manifest dist-test/manifest.txt \
+            --firmware /tmp/tampered.bin; then
+            echo 'tampered firmware was accepted' >&2
+            exit 1
+          fi
+          cp dist-test/manifest.txt /tmp/tampered-manifest.txt
+          sed -i 's/version=2/version=3/' /tmp/tampered-manifest.txt
+          if .venv/bin/python tools/ota_release.py verify \
+            --public .dev/ci-public.pem \
+            --manifest /tmp/tampered-manifest.txt \
+            --firmware dist-test/atoms3r-v2.bin; then
+            echo 'tampered manifest was accepted' >&2
+            exit 1
+          fi

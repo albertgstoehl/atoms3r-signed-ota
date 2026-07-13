@@ -1,0 +1,7 @@
+.pio/
+.venv/
+.dev/
+dist/
+include/public_key.h
+*.bin
+*.elf
