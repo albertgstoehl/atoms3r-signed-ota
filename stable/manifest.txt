@@ -1,5 +1,5 @@
-version=3
-size=1193712
-sha256=6054bf6d9abdc3429f31d63c4c46416130167adbf53169abe6b4ecd0cab13766
-url=https://github.com/albertgstoehl/atoms3r-signed-ota/releases/download/v3/atoms3r-v3.bin
-signature=MEUCIH3XfcDQkt+g/jAkGjUE86Qoj86Z2EvMhwsugYKb/U5qAiEA9R6/dTw91gX9lk2SCoQbyMAifhnDV8oyXsk3TRA6B/Q=
+version=1
+size=1188432
+sha256=c4da6bf15883c445d837549e3795a3ee7825cf8de19f1d0338f77850fe5d4710
+url=https://github.com/albertgstoehl/atoms3r-signed-ota/releases/download/v1/atoms3r-v1.bin
+signature=MEQCICqMa0u0V3dd9BSxJezTwZ6KwCa2hMj01R/zXJK0WBXUAiBJyUAfk6yjTg1MQfQKfmv0REyv+3PNUN3330ocDMr9Kw==
