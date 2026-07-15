@@ -1,0 +1,5 @@
+version=2
+size=1188432
+sha256=967da08938c7f5183b07ebf89852653a4999b28090b5649ad7da72393d138aa3
+url=https://github.com/albertgstoehl/atoms3r-signed-ota/releases/download/v2/atoms3r-v2.bin
+signature=MEUCIQDe8xmmmw/V28SVraFPwgzzaAl+/IZ4w56CrHKJXNTPKQIgHoMocnQadmL5y0lfVrtLW7WAvhwxJyK2VjjAn5L9gOs=
