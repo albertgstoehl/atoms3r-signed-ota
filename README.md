@@ -85,8 +85,8 @@ GitHub Actions uses a freshly generated disposable CI key. It never receives the
 
 ## Important
 
-- Stable v1 is the pinned recovery image.
-- v2 is a known failed candidate and must never be republished to stable.
+- Stable v1 is the pinned recovery image and the only physically accepted release.
+- v2 and v3 are known failed candidates that produced rollback/redownload loops. They must remain excluded from stable and must not be republished.
 - `github_ca_bundle.h` contains the validated ISRG Root X1 plus USERTrust ECC public roots for GitHub Raw, Releases, and object storage.
-- Production v3 publication still follows immutable-binary-first, stable-manifest-last ordering.
-- A passing compile, signature check, or download is not physical acceptance; verify the AtomS3R display/runtime and retain the v1 USB recovery image.
+- No further production OTA candidate should be offered until failed-candidate suppression exists in the known-good installed base and is physically proven before promotion.
+- A passing compile, signature check, or download is not physical acceptance; retain the signed-v1 USB recovery image.
