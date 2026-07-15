@@ -10,7 +10,7 @@ This isolated project prepares a secure no-Steam-Deck update path for the M5Stac
 - HTTPS validates transport; the signature remains authoritative if hosting is compromised.
 - SHA-256 is streamed while writing the inactive OTA partition.
 - The bootloader uses A/B partitions and rollback.
-- A newly installed image is accepted only after PSRAM and 128x128 display self-tests pass.
+- A newly installed image is accepted only after a 128×128 display check and five-second uptime window pass.
 - Versions are monotonically increasing integers; downgrades are rejected.
 - Wi-Fi is provisioned locally through the `AtomS3R-Setup` captive portal.
 
@@ -68,23 +68,25 @@ Create and verify a test release:
   --firmware dist/atoms3r-v2.bin
 ```
 
-## Production bootstrap boundary
+## Production signing and publication boundary
 
-Before the one-time USB bootstrap:
+1. Production private signing stays exclusively in the local/private Hermes profile `qwen36`; never paste or print it in hosted chat.
+2. `include/public_key.h` contains only the public P-256 verifier and is tracked for reproducible builds. Its authoritative key was recovered from immutable signed v1 firmware and independently verified against the v1 manifest.
+3. `include/ota_config.h` contains the CA roots currently validating GitHub Raw and Release downloads. Never use `setInsecure()`.
+4. Build a versioned candidate and inspect its actual bootloader header and decoded partition binary.
+5. Sign locally with the existing private key whose derived public fingerprint exactly matches the embedded verifier.
+6. Create the immutable GitHub Release and upload the firmware first.
+7. Download the public asset and compare exact byte count and SHA-256; verify the signed manifest against it.
+8. Publish `stable/manifest.txt` to the `ota` branch last, then verify the exact fixed Raw URL.
 
-1. Switch to the local/private Hermes profile `qwen36`.
-2. Generate the production private key there; never paste or print it in a hosted chat.
-3. Store the private key with restrictive permissions and a separate encrypted backup.
-4. Generate `include/public_key.h` from the production public key.
-5. The manifest endpoint is fixed to the public `ota` branch; replace placeholder `OTA_ROOT_CA` with the CA root validating both GitHub Raw and Release downloads.
-6. Rebuild and sign with a version-specific release URL such as `https://github.com/albertgstoehl/atoms3r-signed-ota/releases/download/v2`.
-7. Create the immutable GitHub Release and upload `atoms3r-v2.bin` first.
-8. Verify the public asset's size and SHA-256, then publish the signed `manifest.txt` to `stable/manifest.txt` on the `ota` branch last.
-9. Test signature rejection, hash rejection, interrupted download, successful update, failed-health rollback, and recovery backup restoration.
-10. Only then perform the one final USB bootstrap on a stable connection.
+The v3 source adds a durable NVS attempt/failure ledger. A known-good image records a rolled-back `(version, firmware SHA-256)` and suppresses that exact candidate, preventing the v1→bad candidate→rollback→redownload loop observed with v2. Pending-image health now reports explicit serial reason codes and uses the proven 128×128 display plus five-second uptime path rather than the unproven v2 PSRAM predicate.
 
 GitHub Actions uses a freshly generated disposable CI key. It never receives the production private key and cannot publish production releases.
 
 ## Important
 
-The current `ota_config.h` points at the intended public GitHub manifest location and embeds the public ISRG Root X1 plus USERTrust ECC roots needed by the current GitHub Raw/Releases chains. Production builds still require a locally generated `include/public_key.h`; that generated header is intentionally ignored by Git.
+- Stable v1 is the pinned recovery image.
+- v2 is a known failed candidate and must never be republished to stable.
+- `github_ca_bundle.h` contains the validated ISRG Root X1 plus USERTrust ECC public roots for GitHub Raw, Releases, and object storage.
+- Production v3 publication still follows immutable-binary-first, stable-manifest-last ordering.
+- A passing compile, signature check, or download is not physical acceptance; verify the AtomS3R display/runtime and retain the v1 USB recovery image.

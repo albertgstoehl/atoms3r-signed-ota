@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <HTTPClient.h>
 #include <M5Unified.h>
+#include <Preferences.h>
 #include <Update.h>
 #include <WiFiClientSecure.h>
 #include <WiFiManager.h>
@@ -232,6 +233,57 @@ bool install_update(const Manifest& manifest) {
   return true;
 }
 
+void clear_attempt_ledger() {
+  Preferences prefs;
+  if (!prefs.begin("ota_state", false)) return;
+  prefs.remove("attempt_ver");
+  prefs.remove("attempt_sha");
+  prefs.end();
+}
+
+void record_attempt(const Manifest& manifest) {
+  Preferences prefs;
+  if (!prefs.begin("ota_state", false)) return;
+  prefs.putUInt("attempt_ver", manifest.version);
+  prefs.putString("attempt_sha", manifest.sha256);
+  prefs.end();
+}
+
+void record_rollback_if_needed() {
+  Preferences prefs;
+  if (!prefs.begin("ota_state", false)) return;
+  const uint32_t attempted = prefs.getUInt("attempt_ver", 0);
+  const String attempted_sha = prefs.getString("attempt_sha", "");
+  if (attempted > static_cast<uint32_t>(FIRMWARE_VERSION) && attempted_sha.length() == 64) {
+    prefs.putUInt("failed_ver", attempted);
+    prefs.putString("failed_sha", attempted_sha);
+    prefs.remove("attempt_ver");
+    prefs.remove("attempt_sha");
+    Serial.printf("OTA_ROLLBACK_RECORDED version=%u sha=%s\n", attempted, attempted_sha.c_str());
+  }
+  prefs.end();
+}
+
+bool candidate_is_suppressed(const Manifest& manifest) {
+  Preferences prefs;
+  if (!prefs.begin("ota_state", true)) return false;
+  const uint32_t failed = prefs.getUInt("failed_ver", 0);
+  const String failed_sha = prefs.getString("failed_sha", "");
+  prefs.end();
+  return failed == manifest.version && failed_sha == manifest.sha256;
+}
+
+void accept_pending_image() {
+  Preferences prefs;
+  if (!prefs.begin("ota_state", false)) return;
+  prefs.putUInt("confirmed_ver", static_cast<uint32_t>(FIRMWARE_VERSION));
+  prefs.remove("attempt_ver");
+  prefs.remove("attempt_sha");
+  prefs.remove("failed_ver");
+  prefs.remove("failed_sha");
+  prefs.end();
+}
+
 void check_for_update() {
   if (update_in_progress || WiFi.status() != WL_CONNECTED) return;
   update_in_progress = true;
@@ -248,9 +300,17 @@ void check_for_update() {
     update_in_progress = false;
     return;
   }
+  if (candidate_is_suppressed(manifest)) {
+    status_screen("OTA suppressed", String("failed version ") + manifest.version, TFT_MAROON);
+    Serial.printf("OTA_CANDIDATE_SUPPRESSED version=%u sha=%s\n", manifest.version, manifest.sha256.c_str());
+    update_in_progress = false;
+    return;
+  }
 
   status_screen("OTA update", String("version ") + manifest.version, TFT_PURPLE);
+  record_attempt(manifest);
   if (!install_update(manifest)) {
+    clear_attempt_ledger();
     status_screen("OTA failed", "old image retained", TFT_MAROON);
     update_in_progress = false;
     return;
@@ -277,14 +337,18 @@ void validate_pending_image() {
   if (esp_ota_get_state_partition(running, &state) != ESP_OK || state != ESP_OTA_IMG_PENDING_VERIFY) {
     return;
   }
-  status_screen("OTA self-test", "checking hardware", TFT_ORANGE);
-  const bool healthy = psramFound() && M5.Display.width() == 128 && M5.Display.height() == 128;
+  status_screen("OTA self-test", "display + uptime", TFT_ORANGE);
   delay(5000);
-  if (healthy) {
-    esp_ota_mark_app_valid_cancel_rollback();
+  const bool display_ok = M5.Display.width() == 128 && M5.Display.height() == 128;
+  if (display_ok && esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) {
+    accept_pending_image();
+    Serial.printf("OTA_HEALTH_OK version=%u display=%dx%d\n",
+                  static_cast<unsigned>(FIRMWARE_VERSION), M5.Display.width(), M5.Display.height());
     status_screen("OTA accepted", String("version ") + FIRMWARE_VERSION, TFT_DARKGREEN);
   } else {
-    status_screen("OTA rollback", "health check failed", TFT_MAROON);
+    Serial.printf("OTA_HEALTH_FAIL version=%u display=%dx%d\n",
+                  static_cast<unsigned>(FIRMWARE_VERSION), M5.Display.width(), M5.Display.height());
+    status_screen("OTA rollback", "display health failed", TFT_MAROON);
     delay(1000);
     esp_ota_mark_app_invalid_rollback_and_reboot();
   }
@@ -299,6 +363,7 @@ void setup() {
   M5.Display.setRotation(0);
   status_screen("AtomS3R OTA", String("version ") + FIRMWARE_VERSION);
   validate_pending_image();
+  record_rollback_if_needed();
 
   WiFiManager wifi_manager;
   wifi_manager.setConfigPortalTimeout(180);

@@ -2,6 +2,6 @@
 .venv/
 .dev/
 dist/
-include/public_key.h
+dist-*/
 *.bin
 *.elf
